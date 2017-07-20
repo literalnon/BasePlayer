@@ -10,6 +10,7 @@ import android.graphics.Point;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.preference.TwoStatePreference;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.DragEvent;
 import android.view.GestureDetector;
@@ -36,26 +37,28 @@ import java.util.logging.LogRecord;
  */
 public class ListAdapter extends BaseAdapter {
 
-    LayoutInflater inflater;
-    Activity context;
-    File f;
-    View fileView;
+    private LayoutInflater inflater;
+    private File dragFile;
+    private String dragName;
+    private View fileView;
+    private Presenter presenter;
+
     private int drag_y;
     private int drag_x;
 
-    public ListAdapter(Activity context){
-        this.context = context;
+    public ListAdapter(Context context, Presenter presenter){
         inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        this.presenter = presenter;
     }
 
     @Override
     public int getCount() {
-        return MainActivity.mp3files.size();
+        return presenter.getSizeMp3();
     }
 
     @Override
     public Object getItem(int position) {
-        return MainActivity.mp3files.get(position);
+        return presenter.getMp3File(position);
     }
 
     @Override
@@ -70,23 +73,20 @@ public class ListAdapter extends BaseAdapter {
             view = inflater.inflate(android.R.layout.simple_list_item_1, parent, false);
         }
 
-        view.setTag(MainActivity.mp3files.elementAt(position));
+        view.setTag(presenter.getMp3File(position));
 
         TextView textView = ((TextView) view.findViewById(android.R.id.text1));
 
-        if(MainActivity.mediaPlayer.isPlaying() && position == MainActivity.curPosition)
-            textView.setText(">" + MainActivity.mp3files.get(position).getName());
-        else
-            textView.setText(MainActivity.mp3files.get(position).getName());
+        textView.setText(getName(position, presenter.getMp3File(position).getName()));
 
         textView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                ((TextView)v).setText("> " + ((TextView) v).getText().toString());
+                ((TextView)v).setText(TextUtils.concat("> ", ((TextView) v).getText().toString()));
                 notifyDataSetChanged();
-                MainActivity.btnPlay.setClickable(true);
-                MainActivity.PlayRes(position);
-                context.finish();
+                //MainActivity.btnPlay.setClickable(true);
+                presenter.play(position);
+                presenter.getMainView().HideListFragment();
             }
         });
 
@@ -95,11 +95,11 @@ public class ListAdapter extends BaseAdapter {
             public boolean onDrag(View v, DragEvent event) {
                 switch (event.getAction()) {
                     case (DragEvent.ACTION_DROP):
-                        ((TextView) v).setText(f.getName());
+                        ((TextView) v).setText(dragName);
                         break;
                     case (DragEvent.ACTION_DRAG_LOCATION):
                         swap(v);
-                        swap(position);
+                        presenter.dragFile(dragFile, position);
                         break;
                 }
                 return true;
@@ -112,9 +112,11 @@ public class ListAdapter extends BaseAdapter {
                 View.DragShadowBuilder shadowBuilder = new MyShadow(v,new Point(drag_x,drag_y));
                 v.startDrag(null, shadowBuilder, position, 0);
 
+                dragName = ((TextView)v).getText().toString();
+
                 ((TextView)v).setText("");
 
-                f = MainActivity.mp3files.get(position);
+                dragFile = presenter.getMp3File(position);
                 fileView = v;
                 return true;
             }
@@ -133,17 +135,17 @@ public class ListAdapter extends BaseAdapter {
         return view;
     }
 
-    public void swap(int j){
-        MainActivity.mp3files.remove(f);
-        MainActivity.mp3files.insertElementAt(f, j);
-    }
-
     public void swap(View v){
         String v1_text = ((TextView) v).getText().toString();
         ((TextView)fileView).setText(v1_text);
         ((TextView)v).setText("");
         fileView = v;
-
     }
 
+    private String getName(int position, String name){
+        if(presenter.playerIsPlaying() && position == presenter.getCurrentPosition())
+            return TextUtils.concat("> ", name).toString();
+        else
+            return name;
+    }
 }
